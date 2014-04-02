@@ -30,6 +30,21 @@ body {
     margin-right: auto;
 }
 
+.left-badge {
+    float: left;
+    width: 20px;
+    padding-top: 2px;
+    height: 18px;
+    margin-left: 6px;
+    margin-bottom: 4px;
+    margin-top: 4px;
+    border-radius: 50%;
+    background-color: red;
+    color: white;
+    text-align: center;
+    box-shadow: 1px 1px 1px rgba(0, 0, 0, 0.18);
+}
+
 .right-badge {
     float: right;
     width: 20px;
@@ -133,6 +148,9 @@ a:active {
     background-color: pink;
 }
 
+.comment-header.new-comment {
+    background-color: violet;
+}
 .comment-header p {
     margin-bottom: 0;
     margin-top: 0;

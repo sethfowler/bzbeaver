@@ -24,6 +24,7 @@ import qualified Data.Map as M
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import           Data.Time.Clock
+import           Data.Time.Clock.POSIX
 import qualified Network.Gravatar as G
 import           Snap
 import           Snap.Core
@@ -97,24 +98,25 @@ handleDashboard = do
     Just user -> do
       let login = userLogin user
       reqMVar <- withTop' id $ gets $ _bzRequestsMVar
-      mRequests <- liftIO $ getBugzillaRequest reqMVar login
-      case mRequests of
-        Just requests -> renderDashboard requests
+      mReqs <- liftIO $ getBugzillaRequest reqMVar login
+      case mReqs of
+        Just (ls, rs) -> renderDashboard ls rs
         Nothing       -> handleLogin $ Just "You've been logged out. Please log in again."
     Nothing -> handleLogin $ Just "You need to be logged in for that."
 
-renderDashboard :: [BzRequest] -> Handler App (AuthManager App) ()
-renderDashboard requests = do
+renderDashboard :: UTCTime -> [BzRequest] -> Handler App (AuthManager App) ()
+renderDashboard lastSeen requests = do
   curTime <- liftIO $ getCurrentTime
   let (nis, rs, fs) = countRequests requests
-      splices = do "dashboardItems" ## I.mapSplices (dashboardItemSplice curTime) requests
+      splices = do "dashboardItems" ## I.mapSplices (dashboardItemSplice lastSeen curTime)
+                                                    requests
                    "needinfoCount" ## (return [X.TextNode . T.pack . show $ nis])
                    "reviewCount" ## (return [X.TextNode . T.pack . show $ rs])
                    "feedbackCount" ## (return [X.TextNode . T.pack . show $ fs])
   heistLocal (I.bindSplices splices) $ render "dashboard"
 
-dashboardItemSplice :: UTCTime -> BzRequest -> I.Splice (Handler App App)
-dashboardItemSplice curTime req = return $
+dashboardItemSplice :: UTCTime -> UTCTime -> BzRequest -> I.Splice (Handler App App)
+dashboardItemSplice lastSeen curTime req = return $
     [divNode ["item"] $
        [ divNode [reqClass req] $
            titleBadge req ++
@@ -135,9 +137,12 @@ dashboardItemSplice curTime req = return $
         url (ReviewRequest _ _ att)   = attURL r att
         url (FeedbackRequest _ _ att) = attURL r att
 
-    titleBadge (NeedinfoRequest _ _ flag) = timeBadgeNode curTime (flagCreationDate flag)
-    titleBadge (ReviewRequest _ _ att)    = timeBadgeNode curTime (attachmentCreationTime att)
-    titleBadge (FeedbackRequest _ _ att)  = timeBadgeNode curTime (attachmentCreationTime att)
+    titleBadge (NeedinfoRequest _ cs flag) = timeBadgeNode lastSeen cs curTime
+                                             (flagCreationDate flag)
+    titleBadge (ReviewRequest _ cs att)    = timeBadgeNode lastSeen cs curTime
+                                             (attachmentCreationTime att)
+    titleBadge (FeedbackRequest _ cs att)  = timeBadgeNode lastSeen cs curTime
+                                             (attachmentCreationTime att)
 
     reqClass (NeedinfoRequest _ _ _) = "needinfo"
     reqClass (ReviewRequest _ _ _)   = "review"
@@ -178,7 +183,7 @@ dashboardItemSplice curTime req = return $
                      [ divNode ["comments"] $ map (commentNode r 0) (reqComments r)]]
 
     commentNode r limit c = divNode ["comment"] $
-      [ divNode ["comment-header"] $
+      [ divNode (commentHeaderClasses lastSeen $ commentCreationTime c) $
           [ gravatarImg (commentCreator c)
           , pNode [commentCreator c]
           , X.Element "p" [] $
@@ -267,15 +272,32 @@ timeNode curTime itemTime
     node cs = X.Element "p" [classes cs]
                             [textNode [T.pack . show $ itemTime]]
 
-timeBadgeNode :: UTCTime -> UTCTime -> [X.Node]
-timeBadgeNode curTime itemTime
-  | timeDiff > oneMonth = [node ["!!!"]]
-  | timeDiff > twoWeeks = [node ["!!"]]
-  | timeDiff > oneWeek  = [node ["!"]]
-  | otherwise           = []
+timeBadgeNode :: UTCTime -> [Comment] -> UTCTime -> UTCTime -> [X.Node]
+timeBadgeNode lastSeen cs curTime itemTime = newComment cs ++ overdue
   where
-    timeDiff = curTime `diffUTCTime` itemTime
-    node ts = divNode ["right-badge"] [textNode ts]
+    newComment (c:_)
+      | commentTimeDiff > 0 = [divNode ["left-badge"] [textNode ["+"]]]
+      | otherwise           = []
+      where
+        commentTimeDiff = (commentCreationTime c) `diffUTCTime` lastSeen
+
+    newComment _ = []
+
+    overdue
+      | overdueTimeDiff > oneMonth = [overdueNode ["!!!"]]
+      | overdueTimeDiff > twoWeeks = [overdueNode ["!!"]]
+      | overdueTimeDiff > oneWeek  = [overdueNode ["!"]]
+      | otherwise                  = []
+      where
+        overdueTimeDiff = curTime `diffUTCTime` itemTime
+        overdueNode ts  = divNode ["right-badge"] [textNode ts]
+
+commentHeaderClasses :: UTCTime -> UTCTime -> [T.Text]
+commentHeaderClasses lastSeen itemTime
+  | timeDiff > 0 = ["comment-header", "new-comment"]
+  | otherwise    = ["comment-header"]
+  where
+    timeDiff = itemTime `diffUTCTime` lastSeen
 
 same :: Eq b => (a -> b) -> a -> a -> Bool
 same f a b = f a == f b
@@ -339,11 +361,12 @@ pollBugzilla !mv !intervalMin = do
   -- Update all registered users.
   modifyMVar_ mv $ \bzReqs -> do
 
-    newReqs <- forM (M.toList bzReqs) $ \(ui@(UserInfo user pass), _) -> do
+    newReqs <- forM (M.toList bzReqs) $ \(ui@(UserInfo user pass _), _) -> do
+      putStrLn $ "Updating requests from Bugzilla for user " ++ show user
       rs <- bzRequests user (Just pass)
       return (ui, rs)
 
-    return $ M.fromList newReqs
+    return $! M.fromList newReqs
 
   -- Do it again.
   pollBugzilla mv intervalMin
@@ -351,16 +374,24 @@ pollBugzilla !mv !intervalMin = do
 addPolledBugzillaRequest :: MVar (M.Map UserInfo [BzRequest]) -> T.Text -> T.Text -> IO ()
 addPolledBugzillaRequest mv user pass = do
   -- Perform an initial request.
+  let newTime = posixSecondsToUTCTime $ fromIntegral 0
   reqs <- bzRequests user (Just pass)
 
   -- Update the registered requests map.
   modifyMVar_ mv $ \bzReqs ->
-    return $ M.insert (UserInfo user pass) reqs bzReqs
+    return $! M.insert (UserInfo user pass newTime) reqs bzReqs
 
-getBugzillaRequest :: MVar (M.Map UserInfo [BzRequest]) -> T.Text -> IO (Maybe [BzRequest])
-getBugzillaRequest mv user = do
-  bzReqs <- readMVar mv
-  let userReqs = filter (\((UserInfo u p), v) -> u == user) . M.toList $ bzReqs
-  case userReqs of
-    [(_, req)] -> return $ Just req
-    _          -> return Nothing
+getBugzillaRequest :: MVar (M.Map UserInfo [BzRequest]) -> T.Text
+                   -> IO (Maybe (UTCTime, [BzRequest]))
+getBugzillaRequest mv user =
+    modifyMVar mv $ \bzReqs -> do
+      let userReqs = filter matchesUser . M.toList $ bzReqs
+      case userReqs of
+        [(ui, reqs)] -> do curTime <- getCurrentTime
+                           let !newReqs = (M.insert (ui { uiLastSeen = curTime }) reqs)
+                                        . (M.delete ui)
+                                        $ bzReqs
+                           return (newReqs, Just (uiLastSeen ui, reqs))
+        _            -> return (bzReqs, Nothing)
+  where
+    matchesUser = (== user) . uiUser . fst

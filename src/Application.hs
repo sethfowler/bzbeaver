@@ -11,6 +11,7 @@ import Control.Concurrent.MVar
 import Control.Lens
 import qualified Data.Map as M
 import qualified Data.Text as T
+import Data.Time.Clock
 import Snap.Snaplet
 import Snap.Snaplet.Heist
 import Snap.Snaplet.Auth
@@ -19,8 +20,11 @@ import Snap.Snaplet.Session
 import Bugzilla
 
 ------------------------------------------------------------------------------
-data UserInfo = UserInfo T.Text T.Text
-                deriving (Eq, Ord, Show)
+data UserInfo = UserInfo
+  { uiUser     :: T.Text
+  , uiPassword :: T.Text
+  , uiLastSeen :: UTCTime
+  } deriving (Eq, Ord, Show)
 
 data App = App
     { _heist :: Snaplet (Heist App)

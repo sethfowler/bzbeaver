@@ -75,6 +75,10 @@ body {
     color: white;
 }
 
+.assigned {
+    background-color: #ff6600;
+    color: white;
+}
 
 .summary {
     color: #333;

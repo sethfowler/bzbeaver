@@ -1,10 +1,11 @@
 Name:                bzbeaver
 Version:             0.1
-Synopsis:            Project Synopsis Here
-Description:         Project Description Here
-License:             AllRightsReserved
-Author:              Author
-Maintainer:          maintainer@example.com
+Synopsis:            A dashboard for Bugzilla developers
+Description:         This (very alpha) project is an attempt to make it easier for developers
+                     to stay up-to-date with a Bugzilla-based bug tracker.
+License:             BSD3
+Author:              Seth Fowler <mark.seth.fowler@gmail.com>
+Maintainer:          Seth Fowler <mark.seth.fowler@gmail.com>
 Stability:           Experimental
 Category:            Web
 Build-type:          Simple

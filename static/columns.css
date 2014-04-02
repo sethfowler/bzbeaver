@@ -45,6 +45,7 @@
     color: rgba(21, 21, 21, 0.2);
     height: 1px;
     width: 100%;
+    clear: both;
 }
 
 .item p {

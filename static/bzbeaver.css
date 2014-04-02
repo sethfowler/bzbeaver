@@ -25,6 +25,7 @@ body {
     border-radius: 3px 3px 0px 0px;
     max-width: 125px;
     margin-top: 0px;
+    margin-bottom: 0px;
     margin-left: auto;
     margin-right: auto;
 }
@@ -47,14 +48,17 @@ body {
 
 .summary {
     color: #333;
+    clear: both;
 }
 
 .detail {
     color: #717171;
+    clear: both;
 }
 
 .extended {
-    color: #b7b7b7;
+    //color: #b7b7b7;
+    background-color: pink;
 }
 
 .extended p {
@@ -69,6 +73,7 @@ body {
     margin-left: 3px;
     margin-right: 6px;
     margin-bottom: 3px;
+    margin-top: 3px;
     border-radius: 50%;
 }
 
@@ -103,4 +108,91 @@ a:active {
 
 .extremely-overdue:after {
     content: " (!!!)"
+}
+
+.item .comments-inner-wrapper {
+    display: none;
+}
+
+.item:hover .comments-inner-wrapper {
+    display: block;
+}
+
+.comment {
+    padding-top: 2px;
+}
+
+.comment > p {
+    clear: left;
+}
+
+.comment-header {
+    background-color: pink;
+}
+
+.comment-header p {
+    margin-bottom: 0;
+    margin-top: 0;
+}
+
+.comments-inner-wrapper {
+  position: absolute;
+  width: 600px;
+  height: 300px;
+  padding-left: 5px;
+  padding-right: 5px;
+  background: #FFFFFF;
+  -webkit-border-radius: 10px;
+  -moz-border-radius: 10px;
+  border-radius: 10px;
+  border: #7F7F7F solid 3px;
+  overflow: visible;
+}
+
+.comments-inner-wrapper:after {
+  content: '';
+  position: absolute;
+  border-style: solid;
+  border-width: 0 15px 15px;
+  border-color: #FFFFFF transparent;
+  display: block;
+  width: 0;
+  z-index: 1;
+  margin-left: -15px;
+  top: -15px;
+  left: 20%;
+}
+
+.comments-inner-wrapper:before {
+  content: '';
+  position: absolute;
+  border-style: solid;
+  border-width: 0 17px 17px;
+  border-color: #7F7F7F transparent;
+  display: block;
+  width: 0;
+  z-index: 0;
+  margin-left: -17px;
+  top: -20px;
+  left: 20%;
+}
+
+.comments {
+  width: 600px;
+  height: 300px;
+  padding: 0px;
+  overflow-x: visible;
+  overflow-y: scroll;
+}
+
+.quote {
+  background: #f9f9f9;
+  border-left: 10px solid #ccc;
+  margin: 1.5em 10px;
+  padding: 0.5em 10px;
+  quotes: "\201C""\201D""\2018""\2019";
+}
+
+.quote p {
+  display: inline;
 }

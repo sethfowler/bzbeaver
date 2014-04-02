@@ -4,49 +4,67 @@
 module Bugzilla
 ( bzRequests
 , BzRequest (..)
+, reqBug
+, reqComments
 ) where
 
+import Control.Applicative
 import Control.Monad
 import qualified Data.Text as T
 import Web.Bugzilla
 import Web.Bugzilla.Search
 
-data BzRequest = NeedinfoRequest Bug Flag
-               | ReviewRequest Bug Attachment
-               | FeedbackRequest Bug Attachment
+data BzRequest = NeedinfoRequest Bug [Comment] Flag
+               | ReviewRequest Bug [Comment] Attachment
+               | FeedbackRequest Bug [Comment] Attachment
+
+reqBug :: BzRequest -> Bug
+reqBug (NeedinfoRequest bug _ _) = bug
+reqBug (ReviewRequest bug _ _) = bug
+reqBug (FeedbackRequest bug _ _) = bug
+
+reqComments :: BzRequest -> [Comment]
+reqComments (NeedinfoRequest _ cs _) = cs
+reqComments (ReviewRequest _ cs _) = cs
+reqComments (FeedbackRequest _ cs _) = cs
 
 bzRequests :: UserEmail -> Maybe T.Text -> IO [BzRequest]
 bzRequests user pass = withBz user pass $ doRequests user
+
+takeLastReversed :: Int -> [a] -> [a]
+takeLastReversed n = take n . reverse
+
+recentComments :: [Comment] -> [Comment]
+recentComments = takeLastReversed 10 . filter (\c -> commentCreator c /= "tbplbot@gmail.com")
 
 doRequests :: UserEmail -> BugzillaSession -> IO [BzRequest]
 doRequests user session = do
     let needinfoSearch = FlagRequesteeField .==. user .&&. FlagsField `contains` "needinfo"
     needinfoBugs <- searchBugs session needinfoSearch
-    let needinfoReqs :: [BzRequest]
-        needinfoReqs = concatMap mkNeedinfoReq needinfoBugs
+    needinfoReqs <- forM needinfoBugs $ \bug -> do
+      let flags = filter hasNeedinfoFlag (bugFlags bug)
+      case flags of
+        [flag] -> do comments <- recentComments <$> getComments session (bugId bug)
+                     return [NeedinfoRequest bug comments flag]
+        _      -> return []
 
     let reviewSearch = FlagRequesteeField .==. user .&&.
                        (FlagsField `contains` "review" .||. FlagsField `contains` "feedback")
     reviewBugs <- searchBugs session reviewSearch
-    rAndFReqs <- forM reviewBugs $ \rBug -> do
-      attachments <- getAttachments session (bugId rBug)
+    rAndFReqs <- forM reviewBugs $ \bug -> do
+      attachments <- getAttachments session (bugId bug)
+      comments <- recentComments <$> getComments session (bugId bug)
       let reviewAttachments = filter (any hasReviewFlag . attachmentFlags) attachments
           reviewReqs :: [BzRequest]
-          reviewReqs = map (ReviewRequest rBug) reviewAttachments
+          reviewReqs = map (ReviewRequest bug comments ) reviewAttachments
           feedbackAttachments = filter (any hasFeedbackFlag . attachmentFlags) attachments
           feedbackReqs :: [BzRequest]
-          feedbackReqs = map (FeedbackRequest rBug) feedbackAttachments
+          feedbackReqs = map (FeedbackRequest bug comments) feedbackAttachments
       return $ reviewReqs ++ feedbackReqs
 
-    return $ needinfoReqs ++ (concat rAndFReqs)
+    return $ (concat needinfoReqs) ++ (concat rAndFReqs)
 
   where
-
-    mkNeedinfoReq bug@(Bug {..}) = do
-      let flags = filter hasNeedinfoFlag bugFlags
-      case flags of
-        [flag] -> [NeedinfoRequest bug flag]
-        _      -> []
 
     hasNeedinfoFlag f = flagRequestee f == Just user && flagName f == "needinfo"
     hasReviewFlag f   = flagRequestee f == Just user && flagName f == "review"

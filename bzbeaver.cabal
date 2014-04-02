@@ -23,7 +23,10 @@ Executable bzbeaver
   main-is: Main.hs
 
   Build-depends:
+    bugzilla,
     bytestring                >= 0.9.1   && < 0.11,
+    data-default,
+    gravatar,
     heist                     >= 0.13    && < 0.14,
     MonadCatchIO-transformers >= 0.2.1   && < 0.4,
     mtl                       >= 2       && < 3,
@@ -33,6 +36,7 @@ Executable bzbeaver
     snap-loader-static        >= 0.9     && < 0.10,
     text                      >= 0.11    && < 1.2,
     time                      >= 1.1     && < 1.5,
+    transformers,
     xmlhtml                   >= 0.1
 
   if flag(old-base)

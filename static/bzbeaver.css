@@ -1,0 +1,106 @@
+body {
+    background-color: rgba(233, 233, 233, 1);  
+    color: #211922;
+    font-family: 'Helvetica Neue','Helvetica',arial,sans-serif;
+    font-size: 12px;
+}
+
+.title {
+    color: rgba(21, 21, 21, 0.8);
+    display: block;
+    font-size: 47px;
+    font-weight: bold;
+    line-height: 52px;
+    margin-left: auto;
+    margin-right: auto;
+    margin-bottom: 21px;
+    margin-top: 33px;
+    max-width: 736px;
+    text-align: center;
+    word-wrap: break-word;
+}
+
+.card-title {
+    display: block;
+    border-radius: 3px 3px 0px 0px;
+    max-width: 125px;
+    margin-top: 0px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.needinfo {
+    background-color: rgba(233, 0, 0, 1);
+    color: white;
+}
+
+.review {
+    background-color: rgba(233, 0, 233, 1);
+    color: white;
+}
+
+.feedback {
+    background-color: rgba(0, 233, 0, 1);
+    color: white;
+}
+
+
+.summary {
+    color: #333;
+}
+
+.detail {
+    color: #717171;
+}
+
+.extended {
+    color: #b7b7b7;
+}
+
+.extended p {
+    margin-bottom: 0;
+    margin-top: 0;
+}
+
+.gravatar img {
+    width: 48px;
+    height: 48px;
+    float: left;
+    margin-left: 3px;
+    margin-right: 6px;
+    margin-bottom: 3px;
+    border-radius: 50%;
+}
+
+a:link {
+    color: inherit;
+    text-decoration: inherit;
+}
+a:hover {
+    color: purple;
+    text-decoration: inherit;
+}
+a:visited {
+    color: inherit;
+    text-decoration: inherit;
+}
+a:active {
+    color: inherit;
+    text-decoration: inherit;
+}
+
+.overdue, .very-overdue, .extremely-overdue {
+    color: #FF0000;
+}
+
+.overdue:after {
+    content: " (!)"
+}
+
+.very-overdue:after {
+    content: " (!!)"
+}
+
+.extremely-overdue:after {
+    content: " (!!!)"
+}

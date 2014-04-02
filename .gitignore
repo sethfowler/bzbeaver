@@ -1,3 +1,5 @@
 dist/
 log/
 site_key.txt
+users.json
+.#*

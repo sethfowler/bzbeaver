@@ -1,7 +1,8 @@
 <html>
   <head>
-    <title>Snap web server</title>
-    <link rel="stylesheet" type="text/css" href="/screen.css"/>
+    <title>BzBeaver</title>
+    <link rel="stylesheet" type="text/css" href="/bzbeaver.css"/>
+    <link rel="stylesheet" type="text/css" href="/columns.css">
   </head>
   <body>
     <div id="content">

@@ -1,4 +1,4 @@
-<h1>Snap Example App Login</h1>
+<h1>BzBeaver Login</h1>
 
 <p><loginError/></p>
 

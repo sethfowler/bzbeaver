@@ -30,6 +30,21 @@ body {
     margin-right: auto;
 }
 
+.right-badge {
+    float: right;
+    width: 20px;
+    padding-top: 2px;
+    height: 18px;
+    margin-right: 6px;
+    margin-bottom: 4px;
+    margin-top: 4px;
+    border-radius: 50%;
+    background-color: red;
+    color: white;
+    text-align: center;
+    box-shadow: 1px 1px 1px rgba(0, 0, 0, 0.18);
+}
+
 .needinfo {
     background-color: rgba(233, 0, 0, 1);
     color: white;
@@ -94,20 +109,8 @@ a:active {
     text-decoration: inherit;
 }
 
-.overdue, .very-overdue, .extremely-overdue {
+.overdue {
     color: #FF0000;
-}
-
-.overdue:after {
-    content: " (!)"
-}
-
-.very-overdue:after {
-    content: " (!!)"
-}
-
-.extremely-overdue:after {
-    content: " (!!!)"
 }
 
 .item .comments-inner-wrapper {

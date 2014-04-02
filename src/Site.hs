@@ -99,18 +99,26 @@ handleDashboard = do
       reqMVar <- withTop' id $ gets $ _bzRequestsMVar
       mRequests <- liftIO $ getBugzillaRequest reqMVar login
       case mRequests of
-        Just requests -> do curTime <- liftIO $ getCurrentTime
-                            let splices = "dashboardItems"
-                                          ## I.mapSplices (dashboardItemSplice curTime) requests
-                            heistLocal (I.bindSplices splices) $ render "dashboard"
-        Nothing -> handleLogin $ Just "You've been logged out. Please log in again."
+        Just requests -> renderDashboard requests
+        Nothing       -> handleLogin $ Just "You've been logged out. Please log in again."
     Nothing -> handleLogin $ Just "You need to be logged in for that."
+
+renderDashboard :: [BzRequest] -> Handler App (AuthManager App) ()
+renderDashboard requests = do
+  curTime <- liftIO $ getCurrentTime
+  let (nis, rs, fs) = countRequests requests
+      splices = do "dashboardItems" ## I.mapSplices (dashboardItemSplice curTime) requests
+                   "needinfoCount" ## (return [X.TextNode . T.pack . show $ nis])
+                   "reviewCount" ## (return [X.TextNode . T.pack . show $ rs])
+                   "feedbackCount" ## (return [X.TextNode . T.pack . show $ fs])
+  heistLocal (I.bindSplices splices) $ render "dashboard"
 
 dashboardItemSplice :: UTCTime -> BzRequest -> I.Splice (Handler App App)
 dashboardItemSplice curTime req = return $
     [divNode ["item"] $
        [ divNode [reqClass req] $
-         [X.Element "h1" [classes ["card-title", reqClass req]] [title req]]
+           titleBadge req ++
+             [X.Element "h1" [classes ["card-title", reqClass req]] [title req]]
        , extended req
        ] ++ details req ++
        [ divNode ["summary"] [X.Element "p" [] [bugLink req]]
@@ -118,12 +126,18 @@ dashboardItemSplice curTime req = return $
        , comments req
        ]
     ]
+
   where
+
     title r = linkNode (url r) [T.toUpper . reqClass $ r]
       where
-        url (NeedinfoRequest _ _ _) = bugURL r
-        url (ReviewRequest _ _ att) = attURL r att
+        url (NeedinfoRequest _ _ _)   = bugURL r
+        url (ReviewRequest _ _ att)   = attURL r att
         url (FeedbackRequest _ _ att) = attURL r att
+
+    titleBadge (NeedinfoRequest _ _ flag) = timeBadgeNode curTime (flagCreationDate flag)
+    titleBadge (ReviewRequest _ _ att)    = timeBadgeNode curTime (attachmentCreationTime att)
+    titleBadge (FeedbackRequest _ _ att)  = timeBadgeNode curTime (attachmentCreationTime att)
 
     reqClass (NeedinfoRequest _ _ _) = "needinfo"
     reqClass (ReviewRequest _ _ _)   = "review"
@@ -246,14 +260,22 @@ oneMonth = fromIntegral $ 4 * 604800
 
 timeNode :: UTCTime -> UTCTime -> X.Node
 timeNode curTime itemTime
-  | timeDiff > oneMonth = node ["extremely-overdue"]
-  | timeDiff > twoWeeks = node ["very-overdue"]
   | timeDiff > oneWeek  = node ["overdue"]
   | otherwise           = node []
   where
     timeDiff = curTime `diffUTCTime` itemTime
     node cs = X.Element "p" [classes cs]
                             [textNode [T.pack . show $ itemTime]]
+
+timeBadgeNode :: UTCTime -> UTCTime -> [X.Node]
+timeBadgeNode curTime itemTime
+  | timeDiff > oneMonth = [node ["!!!"]]
+  | timeDiff > twoWeeks = [node ["!!"]]
+  | timeDiff > oneWeek  = [node ["!"]]
+  | otherwise           = []
+  where
+    timeDiff = curTime `diffUTCTime` itemTime
+    node ts = divNode ["right-badge"] [textNode ts]
 
 same :: Eq b => (a -> b) -> a -> a -> Bool
 same f a b = f a == f b
@@ -267,6 +289,14 @@ stripQuotes = T.concat . dropWhile (== "> ") . T.chunksOf 2
 applyLimit :: Int -> T.Text -> T.Text
 applyLimit 0 = id
 applyLimit n = (`T.append` "...") . T.take n
+
+countRequests :: [BzRequest] -> (Int, Int, Int)
+countRequests rs = go (0, 0, 0) rs
+  where
+    go !count [] = count
+    go (!nis, !rvs, !fbs) ((NeedinfoRequest _ _ _) : rs) = go (nis + 1, rvs, fbs) rs
+    go (!nis, !rvs, !fbs) ((ReviewRequest _ _ _) : rs)   = go (nis, rvs + 1, fbs) rs
+    go (!nis, !rvs, !fbs) ((FeedbackRequest _ _ _) : rs) = go (nis, rvs, fbs + 1) rs
 
 ------------------------------------------------------------------------------
 -- | The application's routes.

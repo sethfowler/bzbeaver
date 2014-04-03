@@ -14,8 +14,11 @@ import           Control.Applicative
 import           Control.Concurrent
 import           Control.Concurrent.Async
 import           Control.Concurrent.MVar
+import           Control.Lens
 import           Control.Monad
+import           Control.Monad.Reader (asks)
 import           Control.Monad.IO.Class (liftIO)
+import qualified Data.Acid as AS
 import           Data.ByteString (ByteString)
 import           Data.Default (def)
 import           Data.List (groupBy)
@@ -29,6 +32,7 @@ import qualified Network.Gravatar as G
 import           Snap
 import           Snap.Core
 import           Snap.Snaplet
+import           Snap.Snaplet.AcidState (Update, Query, update, query, acidInitManual)
 import           Snap.Snaplet.Auth
 import           Snap.Snaplet.Auth.Backends.JsonFile
 import           Snap.Snaplet.Heist
@@ -68,9 +72,22 @@ handleLoginSubmit = do
     invalidErr = Just "Invalid request. Try again."
 
     loginSuccess user pass = do
-      reqMVar <- withTop' id $ gets $ _bzRequestsMVar
-      liftIO $ addPolledBugzillaRequest reqMVar (TE.decodeUtf8 user) (TE.decodeUtf8 pass)
+      let userText = TE.decodeUtf8 user
+          passText = TE.decodeUtf8 pass
 
+      -- Create a Bugzilla session for this user.
+      session <- liftIO $ newBzSession userText (Just passText)
+      mvSessions <- withTop' id $ gets $ _bzSessions
+      liftIO $ modifyMVar_ mvSessions $
+        return . M.insert userText session
+
+      -- Synchronously update requests if there are none stored.
+      mReqs <- query $ GetRequests userText
+      when (isNothing mReqs) $ do
+        reqs <- liftIO $ bzRequests session userText
+        update $ UpdateRequests userText reqs
+
+      -- We're now ready to display the dashboard.
       redirect "/dashboard"
 
 
@@ -86,7 +103,15 @@ handleNewUser :: Handler App (AuthManager App) ()
 handleNewUser = method GET handleForm <|> method POST handleFormSubmit
   where
     handleForm = render "new_user"
-    handleFormSubmit = registerUser "login" "password" >> redirect "/"
+    handleFormSubmit = do
+      mUser <- getParam "login"
+      case mUser of
+        (Just user) -> do let newTime = posixSecondsToUTCTime 0
+                              userText = TE.decodeUtf8 user
+                          update $ AddUser userText (UserInfo newTime)
+                          registerUser "login" "password"
+                          redirect "/"
+        _           -> redirect "/new_user"
 
 
 ------------------------------------------------------------------------------
@@ -97,16 +122,18 @@ handleDashboard = do
   case mUser of
     Just user -> do
       let login = userLogin user
-      reqMVar <- withTop' id $ gets $ _bzRequestsMVar
-      mReqs <- liftIO $ getBugzillaRequest reqMVar login
-      case mReqs of
-        Just (ls, rs) -> renderDashboard ls rs
-        Nothing       -> handleLogin $ Just "You've been logged out. Please log in again."
+      curTime <- liftIO $ getCurrentTime
+      mUserInfo <- query $ GetUser login
+      update $ UpdateUser login (UserInfo curTime)
+      mReqs <- query $ GetRequests login
+      case (mUserInfo, mReqs) of
+        (Just ui, Just reqs) -> renderDashboard curTime (ui ^. uiLastSeen) reqs
+        (Nothing, _)         -> handleLogin $ Just "You don't exist."
+        _                    -> handleLogin $ Just "You've been logged out. Please log in again."
     Nothing -> handleLogin $ Just "You need to be logged in for that."
 
-renderDashboard :: UTCTime -> [BzRequest] -> Handler App (AuthManager App) ()
-renderDashboard lastSeen requests = do
-  curTime <- liftIO $ getCurrentTime
+renderDashboard :: UTCTime -> UTCTime -> [BzRequest] -> Handler App (AuthManager App) ()
+renderDashboard curTime lastSeen requests = do
   let (nis, rs, fs, as) = countRequests requests
       splices = do "dashboardItems" ## I.mapSplices (dashboardItemSplice lastSeen curTime)
                                                     requests
@@ -361,54 +388,31 @@ app = makeSnaplet "app" "An snaplet example application." Nothing $ do
     -- you'll probably want to change this to a more robust auth backend.
     a <- nestSnaplet "auth" auth $
            initJsonFileAuthManager defAuthSettings sess "users.json"
+
+    state <- liftIO $ AS.openLocalState (AppState M.empty M.empty)
+    onUnload (AS.closeAcidState state)
+    acid <- nestSnaplet "acid" acid $ acidInitManual state
+
     addRoutes routes
     addAuthSplices h auth
 
-    mv <- liftIO $ newMVar M.empty
-    t <- liftIO $ async $ pollBugzilla mv 15
+    mvSessions <- liftIO $ newMVar M.empty
+    t <- liftIO $ async $ pollBugzilla mvSessions state 15
 
-    return $ App h s a t mv
+    return $ App h s a acid t mvSessions
 
-pollBugzilla :: MVar (M.Map UserInfo [BzRequest]) -> Int -> IO ()
-pollBugzilla !mv !intervalMin = do
+pollBugzilla :: MVar (M.Map UserLogin BugzillaSession) -> AS.AcidState AppState -> Int -> IO ()
+pollBugzilla !mvSessions !state !intervalMin = do
   -- Wait appropriately.
   let intervalUs = 60000000 * intervalMin
   threadDelay intervalUs
 
-  -- Update all registered users.
-  modifyMVar_ mv $ \bzReqs -> do
-
-    newReqs <- forM (M.toList bzReqs) $ \(ui@(UserInfo user pass _), _) -> do
-      putStrLn $ "Updating requests from Bugzilla for user " ++ show user
-      rs <- bzRequests user (Just pass)
-      return (ui, rs)
-
-    return $! M.fromList newReqs
+  -- Update all users with current sessions.
+  sessions <- readMVar mvSessions
+  forM_ (M.toList sessions) $ \(user, session) -> do
+    putStrLn $ "Updating requests from Bugzilla for user " ++ show user
+    reqs <- bzRequests session user
+    AS.update state $ UpdateRequests user reqs
 
   -- Do it again.
-  pollBugzilla mv intervalMin
-
-addPolledBugzillaRequest :: MVar (M.Map UserInfo [BzRequest]) -> T.Text -> T.Text -> IO ()
-addPolledBugzillaRequest mv user pass = do
-  -- Perform an initial request.
-  let newTime = posixSecondsToUTCTime $ fromIntegral 0
-  reqs <- bzRequests user (Just pass)
-
-  -- Update the registered requests map.
-  modifyMVar_ mv $ \bzReqs ->
-    return $! M.insert (UserInfo user pass newTime) reqs bzReqs
-
-getBugzillaRequest :: MVar (M.Map UserInfo [BzRequest]) -> T.Text
-                   -> IO (Maybe (UTCTime, [BzRequest]))
-getBugzillaRequest mv user =
-    modifyMVar mv $ \bzReqs -> do
-      let userReqs = filter matchesUser . M.toList $ bzReqs
-      case userReqs of
-        [(ui, reqs)] -> do curTime <- getCurrentTime
-                           let !newReqs = (M.insert (ui { uiLastSeen = curTime }) reqs)
-                                        . (M.delete ui)
-                                        $ bzReqs
-                           return (newReqs, Just (uiLastSeen ui, reqs))
-        _            -> return (bzReqs, Nothing)
-  where
-    matchesUser = (== user) . uiUser . fst
+  pollBugzilla mvSessions state intervalMin

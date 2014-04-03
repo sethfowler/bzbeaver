@@ -24,22 +24,27 @@ Executable bzbeaver
   main-is: Main.hs
 
   Build-depends:
+    acid-state,
     async,
     bugzilla,
     bytestring                >= 0.9.1   && < 0.11,
     containers,
     data-default,
     gravatar,
+    hashable,
     heist                     >= 0.13    && < 0.14,
     MonadCatchIO-transformers >= 0.2.1   && < 0.4,
     mtl                       >= 2       && < 3,
+    safecopy,
     snap                      >= 0.13    && < 0.14,
     snap-core                 >= 0.9     && < 0.11,
     snap-server               >= 0.9     && < 0.11,
     snap-loader-static        >= 0.9     && < 0.10,
+    snaplet-acid-state,
     text                      >= 0.11    && < 1.2,
     time                      >= 1.1     && < 1.5,
     transformers,
+    unordered-containers,
     xmlhtml                   >= 0.1
 
   if flag(old-base)

@@ -1,23 +1,57 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Bugzilla
 ( bzRequests
 , BzRequest (..)
 , reqBug
 , reqComments
+, BugzillaSession
+, newBzSession
 ) where
 
 import Control.Applicative
 import Control.Monad
+import Data.Hashable (Hashable)
+import qualified Data.HashMap.Strict as H
+import Data.SafeCopy (base, contain, deriveSafeCopy, getCopy,
+                      putCopy, safeGet, safePut, SafeCopy)
 import qualified Data.Text as T
+import Data.Typeable (Typeable)
 import Web.Bugzilla
 import Web.Bugzilla.Search
 
+newBzSession :: UserEmail -> Maybe T.Text -> IO BugzillaSession
+newBzSession user mPassword = do
+  ctx <- newBugzillaContext "bugzilla.mozilla.org"
+  case mPassword of
+    Just password ->
+      do mSession <- loginSession ctx user password
+         case mSession of
+           Just session -> return session
+           Nothing      -> return $ anonymousSession ctx
+    Nothing -> return $ anonymousSession ctx
+  
 data BzRequest = NeedinfoRequest Bug [Comment] Flag
                | ReviewRequest Bug [Comment] Attachment
                | FeedbackRequest Bug [Comment] Attachment
                | AssignedRequest Bug [Comment]
+                 deriving (Eq, Show, Typeable)
+
+-- Manually implement SafeCopy for HashMap. We need this to derive it
+-- for Bug below.
+instance (SafeCopy a, Eq a, Hashable a, SafeCopy b) => SafeCopy (H.HashMap a b) where
+    getCopy = contain $ fmap H.fromList safeGet 
+    putCopy = contain . safePut . H.toList
+
+deriveSafeCopy 0 'base ''Attachment
+deriveSafeCopy 0 'base ''User
+deriveSafeCopy 0 'base ''Bug
+deriveSafeCopy 0 'base ''Comment
+deriveSafeCopy 0 'base ''Flag
+deriveSafeCopy 0 'base ''BzRequest
 
 reqBug :: BzRequest -> Bug
 reqBug (NeedinfoRequest bug _ _) = bug
@@ -31,17 +65,14 @@ reqComments (ReviewRequest _ cs _) = cs
 reqComments (FeedbackRequest _ cs _) = cs
 reqComments (AssignedRequest _ cs) = cs
 
-bzRequests :: UserEmail -> Maybe T.Text -> IO [BzRequest]
-bzRequests user pass = withBz user pass $ doRequests user
-
 takeLastReversed :: Int -> [a] -> [a]
 takeLastReversed n = take n . reverse
 
 recentComments :: [Comment] -> [Comment]
 recentComments = takeLastReversed 10 . filter (\c -> commentCreator c /= "tbplbot@gmail.com")
 
-doRequests :: UserEmail -> BugzillaSession -> IO [BzRequest]
-doRequests user session = do
+bzRequests :: BugzillaSession -> UserEmail -> IO [BzRequest]
+bzRequests session user = do
     let needinfoSearch = FlagRequesteeField .==. user .&&. FlagsField `contains` "needinfo"
     needinfoBugs <- searchBugs session needinfoSearch
     needinfoReqs <- forM needinfoBugs $ \bug -> do
@@ -84,14 +115,3 @@ doRequests user session = do
     hasNeedinfoFlag f = flagRequestee f == Just user && flagName f == "needinfo"
     hasReviewFlag f   = flagRequestee f == Just user && flagName f == "review"
     hasFeedbackFlag f = flagRequestee f == Just user && flagName f == "feedback"
-
-withBz :: UserEmail -> Maybe T.Text -> (BugzillaSession -> IO a) -> IO a
-withBz user mPassword f = do
-  withBugzillaContext "bugzilla.mozilla.org" $ \ctx ->
-    case mPassword of
-      Just password ->
-        do mSession <- loginSession ctx user password
-           case mSession of
-             Just session -> f session
-             Nothing      -> f $ anonymousSession ctx
-      Nothing -> f $ anonymousSession ctx

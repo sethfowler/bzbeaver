@@ -104,7 +104,7 @@ bzRequests session user = do
     reviewBugs <- searchBugs session reviewSearch
     rAndFReqs <- forM reviewBugs $ \bug -> do
       putStrLn $ "Getting metadata for review/feedback bug " ++ show (bugId bug)
-      attachments <- getAttachments session (bugId bug)
+      attachments <- filter attachmentIsPatch <$> getAttachments session (bugId bug)
       comments <- recentComments <$> getComments session (bugId bug)
       let reviewAttachments = filter (any hasReviewFlag . attachmentFlags) attachments
           reviewReqs :: [BzRequest]
@@ -122,7 +122,7 @@ bzRequests session user = do
     assignedReqs <- forM assignedBugs $ \bug -> do
       putStrLn $ "Getting metadata for assigned bug " ++ show (bugId bug)
       comments <- recentComments <$> getComments session (bugId bug)
-      attachments <- getAttachments session (bugId bug)
+      attachments <- filter attachmentIsPatch <$> getAttachments session (bugId bug)
       let attsByFile = attachmentsByFile attachments
           newestAtts = map snd . newestNonobsoleteByFile $ attsByFile
           hasPendingAtts = any hasPendingFlags attsByFile

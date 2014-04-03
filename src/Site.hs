@@ -151,10 +151,10 @@ dashboardItemSplice lastSeen curTime req = return $
        [ divNode [reqClass req] $
            titleBadge req ++
              [X.Element "h1" [classes ["card-title", reqClass req]] [title req]]
-       , extended req
+       ] ++ extended req ++ [
+         divNode ["summary"] [X.Element "p" [] [bugLink req]]
        ] ++ details req ++
-       [ divNode ["summary"] [X.Element "p" [] [bugLink req]]
-       , lastComment req
+       [ lastComment req
        , comments req
        ]
     ]
@@ -200,47 +200,52 @@ dashboardItemSplice lastSeen curTime req = return $
     bugLink r = linkNode (bugURL r) [bugIdText r, ": ", bugSummary . reqBug $ r]
             
     details (NeedinfoRequest bug _ flag) = []
-    details (ReviewRequest bug _ att)   = [ divNode ["detail"] [pNode [attachmentSummary att]]
-                                          , X.Element "hr" [] []
-                                          ]
-    details (FeedbackRequest bug _ att) = [ divNode ["detail"] [pNode [attachmentSummary att]]
-                                          , X.Element "hr" [] []
-                                          ]
-    details (AssignedRequest bug _ _)   = []
-    details (PendingRequest bug _ _)    = []
-    details (ReviewedRequest bug _ _)   = []
+    details (ReviewRequest bug _ att)    = [ divNode ["detail"] (attachmentNode att)
+                                           ]
+    details (FeedbackRequest bug _ att)  = [ divNode ["detail"] (attachmentNode att)
+                                           ]
+    details (AssignedRequest bug _ atts) = [ divNode ["detail"] (concatMap attachmentNode atts)
+                                           ]
+    details (PendingRequest bug _ atts)  = [ divNode ["detail"] (concatMap attachmentNode atts)
+                                           ]
+    details (ReviewedRequest bug _ atts) = [ divNode ["detail"] (concatMap attachmentNode atts)
+                                           ]
+
+    attachmentNode att =
+      [ X.Element "hr" [] []
+      , divNode ["attachment"] $
+          [ divNode ["attachment-icon"] []
+          , pNode' ["attachment-summary"] [attachmentSummary att]
+          ] ++ map attachmentFlagNode (attachmentFlags att)
+      ]
 
 
-    extended (NeedinfoRequest bug _ flag) = divNode ["extended"] $
+    attachmentFlagNode f = divNode ["attachment-flag"] $
+      [ maybe noSmallGravatar smallGravatarImg (flagRequestee f)
+      , X.Element "p" [] $
+          [ flagNameNode [flagName f, flagStatus f]
+          , textNode [" " , fromMaybe "" (flagRequestee f)]
+          ]
+      ]
+      
+    extended (NeedinfoRequest bug _ flag) = [ divNode ["extended"]
       [ gravatarImg (flagSetter flag)
       , pNode [flagSetter flag]
       , timeNode curTime (flagCreationDate flag)
-      ]
-    extended (ReviewRequest bug _ att) = divNode ["extended"] $
+      ] ]
+    extended (ReviewRequest bug _ att) = [ divNode ["extended"]
       [ gravatarImg (attachmentCreator att)
       , pNode [attachmentCreator att]
       , timeNode curTime (attachmentCreationTime att)
-      ]
-    extended (FeedbackRequest bug _ att) = divNode ["extended"] $
+      ] ]
+    extended (FeedbackRequest bug _ att) = [ divNode ["extended"]
       [ gravatarImg (attachmentCreator att)
       , pNode [attachmentCreator att]
       , timeNode curTime (attachmentCreationTime att)
-      ]
-    extended (AssignedRequest bug _ _) = divNode ["extended"] $
-      [ gravatarImg (bugCreator bug)
-      , pNode [bugCreator bug]
-      , timeNode curTime (bugCreationTime bug)
-      ]
-    extended (PendingRequest bug _ _) = divNode ["extended"] $
-      [ gravatarImg (bugCreator bug)
-      , pNode [bugCreator bug]
-      , timeNode curTime (bugCreationTime bug)
-      ]
-    extended (ReviewedRequest bug _ _) = divNode ["extended"] $
-      [ gravatarImg (bugCreator bug)
-      , pNode [bugCreator bug]
-      , timeNode curTime (bugCreationTime bug)
-      ]
+      ] ]
+    extended (AssignedRequest bug _ _) = []
+    extended (PendingRequest bug _ _)  = []
+    extended (ReviewedRequest bug _ _) = []
 
     lastComment r = divNode ["last-comment-wrapper"] $
                       map (commentNode r 200) (take 1 . reqComments $ r)
@@ -277,6 +282,14 @@ dashboardItemSplice lastSeen curTime req = return $
       where
         url = T.pack $ G.gravatar settings email
         settings = def { G.gDefault = Just G.Retro, G.gSize = Just $ G.Size 48 }
+
+    smallGravatarImg email = divNode ["small-gravatar"] [X.Element "img" [("src", url)] []]
+      where
+        url = T.pack $ G.gravatar settings email
+        settings = def { G.gDefault = Just G.Retro, G.gSize = Just $ G.Size 32 }
+
+    noGravatar = divNode ["no-gravatar"] []
+    noSmallGravatar = divNode ["no-small-gravatar"] []
 
 attURL :: BzRequest -> Attachment -> T.Text
 attURL r att = T.concat [ "https://bugzilla.mozilla.org/page.cgi?id=splinter.html&bug="
@@ -315,6 +328,12 @@ linkNode url ts = X.Element "a" [("href", url)] [textNode ts]
 
 pNode :: [T.Text] -> X.Node
 pNode ts = X.Element "p" [] [textNode ts]
+
+flagNameNode :: [T.Text] -> X.Node
+flagNameNode ts = X.Element "span" [classes ["flag-name"]] [textNode ts]
+
+pNode' :: [T.Text] -> [T.Text] -> X.Node
+pNode' cs ts = X.Element "p" [classes cs] [textNode ts]
 
 pQuoteNode :: [T.Text] -> X.Node
 pQuoteNode ts = X.Element "p" [classes ["quote"]] [textNode ts]

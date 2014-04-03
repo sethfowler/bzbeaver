@@ -91,8 +91,9 @@ body {
 }
 
 .summary {
-    color: #333;
+    color: #111;
     clear: both;
+    font-weight: 500;
 }
 
 .detail {
@@ -110,9 +111,79 @@ body {
     margin-top: 0;
 }
 
+.attachment {
+    margin-bottom: 5px;
+    clear: left;
+}
+
+.attachment-summary {
+    margin-top: 0px;
+    margin-bottom: 0px;
+}
+
+.attachment-icon {
+    float: left;
+    width: 16px;
+    height: 16px;
+    margin-left: 3px;
+    margin-right: 6px;
+    margin-bottom: 3px;
+    margin-top: 3px;
+    background-image: url(data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiA/PjwhRE9DVFlQRSBzdmcgIFBVQkxJQyAnLS8vVzNDLy9EVEQgU1ZHIDEuMS8vRU4nICAnaHR0cDovL3d3dy53My5vcmcvR3JhcGhpY3MvU1ZHLzEuMS9EVEQvc3ZnMTEuZHRkJz48c3ZnIGVuYWJsZS1iYWNrZ3JvdW5kPSJuZXcgMCAwIDMyIDMyIiBoZWlnaHQ9IjMycHgiIGlkPSJMYXllcl8xIiB2ZXJzaW9uPSIxLjEiIHZpZXdCb3g9IjAgMCAzMiAzMiIgd2lkdGg9IjMycHgiIHhtbDpzcGFjZT0icHJlc2VydmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiPjxwYXRoIGQ9Ik0yOS4zNjMsNC42MzdjLTMuNTE0LTMuNTE2LTkuMjEzLTMuNTE2LTEyLjcyNywwTDIuMDQ2LDE5LjA1NGMtMi43MjksMi43MjktMi43MjksNy4xNzEsMCw5LjkgIGMyLjcyOSwyLjcyOSw3LjE3LDIuNzI5LDkuODk4LDBsMTQuNTktMTQuNDE4YzEuOTUzLTEuOTUzLDEuOTUzLTUuMTE4LDAtNy4wNzFjLTEuOTUzLTEuOTUyLTUuMTE5LTEuOTUyLTcuMDcsMEw4LjQ5NiwxOC40MzMgIGMtMC4zOTEsMC4zOTItMC4zOTEsMS4wMjMsMCwxLjQxNWMwLjM5MSwwLjM5MSwxLjAyMywwLjM5MSwxLjQxNCwwTDIwLjg3OSw4Ljg3OWMxLjE3LTEuMTY5LDMuMDcyLTEuMTY5LDQuMjQyLDAgIGMxLjE3LDEuMTcsMS4xNywzLjA3MywwLDQuMjQzbC0xNC41OSwxNC40MTdjLTEuOTUzLDEuOTUzLTUuMTE3LDEuOTUzLTcuMDcsMGMtMS45NTMtMS45NTItMS45NTMtNS4xMTgsMC03LjA3TDE3LjkwOCw2LjE5MiAgYzIuNzM0LTIuNzM0LDcuMTY4LTIuNzM0LDkuODk4LDBjMi43MzYsMi43MzUsMi43MzYsNy4xNjUsMC4wMDIsOS44OTlMMTYuOTgyLDI2LjkxOGMtMC4zOTMsMC4zOTItMC4zOTMsMS4wMjMsMCwxLjQxNCAgYzAuMzkxLDAuMzkyLDEuMDIzLDAuMzkyLDEuNDE0LDBsMTAuOTY3LTEwLjk2OEMzMi44NzksMTMuODUsMzIuODc5LDguMTUxLDI5LjM2Myw0LjYzN3oiIGZpbGw9IiMzMzMzMzMiIGlkPSJjbGlwXzJfIi8+PC9zdmc+);
+    background-size: 16px 16px;
+}
+
+.attachment-flag {
+    margin-left: 10px;
+    clear: left;
+} 
+
+.attachment .attachment-flag p {
+    margin-top: 0px;
+    margin-bottom: 0px;
+    line-height: 32px;
+} 
+
+.flag-name {
+    font-style: italic;
+} 
+
 .gravatar img {
     width: 48px;
     height: 48px;
+    float: left;
+    margin-left: 3px;
+    margin-right: 6px;
+    margin-bottom: 3px;
+    margin-top: 3px;
+    border-radius: 50%;
+}
+
+.small-gravatar img {
+    width: 32;
+    height: 32;
+    float: left;
+    margin-left: 3px;
+    margin-right: 6px;
+    margin-bottom: 3px;
+    margin-top: 3px;
+    border-radius: 50%;
+}
+
+.no-gravatar {
+    width: 48px;
+    height: 48px;
+    float: left;
+    margin-left: 3px;
+    margin-right: 6px;
+    margin-bottom: 3px;
+    margin-top: 3px;
+    border-radius: 50%;
+}
+
+.no-small-gravatar {
+    width: 32px;
+    height: 32px;
     float: left;
     margin-left: 3px;
     margin-right: 6px;
@@ -152,6 +223,7 @@ a:active {
 
 .comment {
     padding-top: 2px;
+    color: #111;
 }
 
 .comment > p {

@@ -39,7 +39,7 @@
     width: 100%;
 }
 
-.item > hr {
+.item hr {
     background-color: rgba(21, 21, 21, 0.2);
     border: 0;
     color: rgba(21, 21, 21, 0.2);

@@ -144,6 +144,12 @@ body {
     line-height: 32px;
 } 
 
+.attachment .attachment-flag .no-small-gravatar + p {
+    margin-top: 0px;
+    margin-bottom: 0px;
+    line-height: 17px;
+} 
+
 .flag-name {
     font-style: italic;
 } 
@@ -172,7 +178,7 @@ body {
 
 .no-gravatar {
     width: 48px;
-    height: 48px;
+    height: 1px;
     float: left;
     margin-left: 3px;
     margin-right: 6px;
@@ -183,7 +189,7 @@ body {
 
 .no-small-gravatar {
     width: 32px;
-    height: 32px;
+    height: 1;
     float: left;
     margin-left: 3px;
     margin-right: 6px;

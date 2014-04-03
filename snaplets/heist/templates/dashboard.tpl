@@ -7,7 +7,9 @@
         "needinfo": true,
         "review": true,
         "feedback": true,
-        "assigned" : true
+        "assigned" : true,
+        "pending" : true,
+        "reviewed" : true
       };
 
       function setDisplay(nodes, val) {
@@ -50,7 +52,6 @@
                 <h1 class="card-title needinfo">NEEDINFO</h1>
               </div>
             </div>
-            <div class="item"></div>
             <div class="item">
               <div class="review" onclick="toggleCategory('review')">
                 <div class="right-badge"><reviewCount/></div>
@@ -69,7 +70,18 @@
                 <h1 class="card-title assigned">ASSIGNED</h1>
               </div>
             </div>
-            <div class="item"></div>
+            <div class="item">
+              <div class="pending" onclick="toggleCategory('pending')">
+                <div class="right-badge"><pendingCount/></div>
+                <h1 class="card-title pending">PENDING</h1>
+              </div>
+            </div>
+            <div class="item">
+              <div class="reviewed" onclick="toggleCategory('reviewed')">
+                <div class="right-badge"><reviewedCount/></div>
+                <h1 class="card-title reviewed">REVIEWED</h1>
+              </div>
+            </div>
         </div>
         <div class="cols">
             <dashboardItems/>

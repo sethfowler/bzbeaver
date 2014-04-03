@@ -80,6 +80,16 @@ body {
     color: white;
 }
 
+.pending {
+    background-color: orange;
+    color: white;
+}
+
+.reviewed {
+    background-color: cornflowerblue;
+    color: white;
+}
+
 .summary {
     color: #333;
     clear: both;

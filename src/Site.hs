@@ -134,13 +134,15 @@ handleDashboard = do
 
 renderDashboard :: UTCTime -> UTCTime -> [BzRequest] -> Handler App (AuthManager App) ()
 renderDashboard curTime lastSeen requests = do
-  let (nis, rs, fs, as) = countRequests requests
+  let (nis, rs, fs, as, ps, rds) = countRequests requests
       splices = do "dashboardItems" ## I.mapSplices (dashboardItemSplice lastSeen curTime)
                                                     requests
-                   "needinfoCount" ## (return [X.TextNode . T.pack . show $ nis])
-                   "reviewCount" ## (return [X.TextNode . T.pack . show $ rs])
-                   "feedbackCount" ## (return [X.TextNode . T.pack . show $ fs])
-                   "assignedCount" ## (return [X.TextNode . T.pack . show $ as])
+                   "needinfoCount"  ## (return [X.TextNode . T.pack . show $ nis])
+                   "reviewCount"    ## (return [X.TextNode . T.pack . show $ rs])
+                   "feedbackCount"  ## (return [X.TextNode . T.pack . show $ fs])
+                   "assignedCount"  ## (return [X.TextNode . T.pack . show $ as])
+                   "pendingCount"   ## (return [X.TextNode . T.pack . show $ ps])
+                   "reviewedCount"  ## (return [X.TextNode . T.pack . show $ rds])
   heistLocal (I.bindSplices splices) $ render "dashboard"
 
 dashboardItemSplice :: UTCTime -> UTCTime -> BzRequest -> I.Splice (Handler App App)
@@ -162,14 +164,18 @@ dashboardItemSplice lastSeen curTime req = return $
     containerClass (NeedinfoRequest _ _ _) = "needinfo-container"
     containerClass (ReviewRequest _ _ _)   = "review-container"
     containerClass (FeedbackRequest _ _ _) = "feedback-container"
-    containerClass (AssignedRequest _ _)   = "assigned-container"
+    containerClass (AssignedRequest _ _ _)   = "assigned-container"
+    containerClass (PendingRequest _ _ _)   = "pending-container"
+    containerClass (ReviewedRequest _ _ _)   = "reviewed-container"
 
     title r = linkNode (url r) [T.toUpper . reqClass $ r]
       where
         url (NeedinfoRequest _ _ _)   = bugURL r
         url (ReviewRequest _ _ att)   = attURL r att
         url (FeedbackRequest _ _ att) = attURL r att
-        url (AssignedRequest _ _)     = bugURL r
+        url (AssignedRequest _ _ _)   = bugURL r
+        url (PendingRequest _ _ _)    = bugURL r
+        url (ReviewedRequest _ _ _)   = bugURL r
 
     titleBadge (NeedinfoRequest _ cs flag) = timeBadgeNode lastSeen cs curTime
                                              (flagCreationDate flag)
@@ -177,24 +183,32 @@ dashboardItemSplice lastSeen curTime req = return $
                                              (attachmentCreationTime att)
     titleBadge (FeedbackRequest _ cs att)  = timeBadgeNode lastSeen cs curTime
                                              (attachmentCreationTime att)
-    titleBadge (AssignedRequest bug cs)    = timeBadgeNode lastSeen cs curTime
+    titleBadge (AssignedRequest bug cs _)  = timeBadgeNode lastSeen cs curTime
                                              (bugCreationTime bug)
+    titleBadge (PendingRequest bug cs _)   = timeBadgeNode lastSeen cs curTime
+                                             (bugCreationTime bug)
+    titleBadge (ReviewedRequest bug cs _)   = timeBadgeNode lastSeen cs curTime
+                                              (bugCreationTime bug)
 
     reqClass (NeedinfoRequest _ _ _) = "needinfo"
     reqClass (ReviewRequest _ _ _)   = "review"
     reqClass (FeedbackRequest _ _ _) = "feedback"
-    reqClass (AssignedRequest _ _)   = "assigned"
+    reqClass (AssignedRequest _ _ _) = "assigned"
+    reqClass (PendingRequest _ _ _)  = "pending"
+    reqClass (ReviewedRequest _ _ _) = "reviewed"
 
     bugLink r = linkNode (bugURL r) [bugIdText r, ": ", bugSummary . reqBug $ r]
             
     details (NeedinfoRequest bug _ flag) = []
-    details (ReviewRequest bug _ att) = [ divNode ["detail"] [pNode [attachmentSummary att]]
-                                        , X.Element "hr" [] []
-                                        ]
+    details (ReviewRequest bug _ att)   = [ divNode ["detail"] [pNode [attachmentSummary att]]
+                                          , X.Element "hr" [] []
+                                          ]
     details (FeedbackRequest bug _ att) = [ divNode ["detail"] [pNode [attachmentSummary att]]
                                           , X.Element "hr" [] []
                                           ]
-    details (AssignedRequest bug _) = []
+    details (AssignedRequest bug _ _)   = []
+    details (PendingRequest bug _ _)    = []
+    details (ReviewedRequest bug _ _)   = []
 
 
     extended (NeedinfoRequest bug _ flag) = divNode ["extended"] $
@@ -212,7 +226,17 @@ dashboardItemSplice lastSeen curTime req = return $
       , pNode [attachmentCreator att]
       , timeNode curTime (attachmentCreationTime att)
       ]
-    extended (AssignedRequest bug _) = divNode ["extended"] $
+    extended (AssignedRequest bug _ _) = divNode ["extended"] $
+      [ gravatarImg (bugCreator bug)
+      , pNode [bugCreator bug]
+      , timeNode curTime (bugCreationTime bug)
+      ]
+    extended (PendingRequest bug _ _) = divNode ["extended"] $
+      [ gravatarImg (bugCreator bug)
+      , pNode [bugCreator bug]
+      , timeNode curTime (bugCreationTime bug)
+      ]
+    extended (ReviewedRequest bug _ _) = divNode ["extended"] $
       [ gravatarImg (bugCreator bug)
       , pNode [bugCreator bug]
       , timeNode curTime (bugCreationTime bug)
@@ -355,14 +379,16 @@ applyLimit :: Int -> T.Text -> T.Text
 applyLimit 0 = id
 applyLimit n = (`T.append` "...") . T.take n
 
-countRequests :: [BzRequest] -> (Int, Int, Int, Int)
-countRequests rs = go (0, 0, 0, 0) rs
+countRequests :: [BzRequest] -> (Int, Int, Int, Int, Int, Int)
+countRequests rs = go (0, 0, 0, 0, 0, 0) rs
   where
     go !count [] = count
-    go (!nis, !rvs, !fbs, !as) ((NeedinfoRequest _ _ _) : rs) = go (nis + 1, rvs, fbs, as) rs
-    go (!nis, !rvs, !fbs, !as) ((ReviewRequest _ _ _) : rs)   = go (nis, rvs + 1, fbs, as) rs
-    go (!nis, !rvs, !fbs, !as) ((FeedbackRequest _ _ _) : rs) = go (nis, rvs, fbs + 1, as) rs
-    go (!nis, !rvs, !fbs, !as) ((AssignedRequest _ _) : rs)   = go (nis, rvs, fbs, as + 1) rs
+    go (!nis, !rvs, !fbs, !as, !ps, !rds) ((NeedinfoRequest _ _ _) : rs) = go (nis + 1, rvs, fbs, as, ps, rds) rs
+    go (!nis, !rvs, !fbs, !as, !ps, !rds) ((ReviewRequest _ _ _) : rs)   = go (nis, rvs + 1, fbs, as, ps, rds) rs
+    go (!nis, !rvs, !fbs, !as, !ps, !rds) ((FeedbackRequest _ _ _) : rs) = go (nis, rvs, fbs + 1, as, ps, rds) rs
+    go (!nis, !rvs, !fbs, !as, !ps, !rds) ((AssignedRequest _ _ _) : rs) = go (nis, rvs, fbs, as + 1, ps, rds) rs
+    go (!nis, !rvs, !fbs, !as, !ps, !rds) ((PendingRequest _ _ _) : rs)  = go (nis, rvs, fbs, as, ps + 1, rds) rs
+    go (!nis, !rvs, !fbs, !as, !ps, !rds) ((ReviewedRequest _ _ _) : rs) = go (nis, rvs, fbs, as, ps, rds + 1) rs
 
 ------------------------------------------------------------------------------
 -- | The application's routes.
